@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DM Manifest Converter</title>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <style type="text/css">
+        .dedm-code-font {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.5em;
+        }
+
+        .dedm-host {}
+
+        .dedm-code {
+            background: #f8f8f8;
+            overflow: auto;
+            width: auto;
+            border: solid gray;
+            border-width: .1em .1em .1em .8em;
+            padding: .2em .6em;
+        }
+
+        .dedm-code-pre {
+            margin: 0;
+            line-height: 125%;
+        }
+
+        .dedm-convert-button {
+            background-color: #007fff;
+            color: #fff;
+        }
+
+        .dedm-convert-button:hover {
+            background-color: #008000;
+            color: #fff;
+
+        }
+    </style>
+</head>
+
+<body>
+    <p class="ui-widget">
+        Use the following command to get manifest id:
+    </p>
+    <pre>gcloud deployment-manager manifests list --deployment [deployment-name]</pre>
+    <p class="ui-widget">
+        Then the following command to extract the manifest:
+    </p>
+    <pre>gcloud deployment-manager manifests describe [manifest-id]  --deployment [deployment-name]</pre>
+    <p class="ui-widget">
+        Paste the output into the textbox below.
+        On MacOs you can use <b><code>| pbclip</code></b> to pipe the output from describe command into the clipboard.
+        Then click <b>Convert</b> button.
+    </p>
+    <p>
+    <div class="dedm-code dedm-code-font">
+        <textarea id="dm-manifest-text" style="width:100%;resize:none;height:100px;"></textarea>
+    </div>
+    </p>
+
+    <p>
+    <div style="padding: 10px;">
+        <button id="button-convert" class="ui-button ui-widget ui-corner-all dedm-convert-button"
+            style="width: 100%;">Convert</button>
+    </div>
+    </p>
+
+    <div id="code-snippet-tabs">
+        <ul>
+            <li><a href="#tabs-1">Config Connector</a></li>
+            <li><a href="#tabs-2">Terraform</a></li>
+        </ul>
+        <div id="tabs-1">
+
+            <div class="dedm-code dedm-code-font">
+                <pre id="pre-kcc" class="dedm-code-pre">{
+}
+</pre>
+            </div>
+        </div>
+        <div id="tabs-2">
+            <div class="dedm-code dedm-code-font">
+                <pre id="pre-tf" class="dedm-code-pre">{
+}
+</pre>
+            </div>
+        </div>
+    </div>
+
+
+
+    <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script>
+        const dedmHost = "http://localhost:46100";
+
+
+        $("#button-convert").click(function () {
+            $("#button-convert").button("disable");
+
+            const dmManifestText = $("#dm-manifest-text").val();
+            const requestUrl = dedmHost + "/api/convert";
+
+            $.ajax({
+                url: requestUrl,
+                type: 'post',
+                headers: {
+                    "Manifest": dmManifestText
+                },
+                dataType: 'json',
+                complete: function (data) {
+                    console.info(data);
+                    $("#button-convert").button("enable");
+                    if (data.status < 500) {
+                        $("#pre-kcc").html(JSON.stringify(data.responseJSON.kcc));
+                        $("#pre-tf").html(JSON.stringify(data.responseJSON.tf));
+                    }
+                }
+            });
+        });
+
+        $(document).ready(function () {
+            $("#code-snippet-tabs").tabs();
+            $("#button-convert").button();
+
+            //$("#button-scrape-test").css("background","green");
+            //$("#button-scrape-test").css("color","#fff");
+            // updateFields();
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gcpdedmns
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gcpdedm-server-deployment
+  namespace: gcpdedmns
+  labels:
+    app: gcpdedm-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector: 
+    matchLabels:
+      app: gcpdedm-server
+  template:
+    metadata:
+      labels:
+        app: gcpdedm-server
+    spec:
+      containers:
+      - name: gcpdedm-server-container
+        image: __Y_IMAGE__
+        ports:
+        - containerPort: 45100
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 45100
+          initialDelaySeconds: 180
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 10
+          successThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 45100
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 20
+          successThreshold: 1
+        command: ['node','dist/src/server.js']
+        resources:
+          requests:
+            memory: "56Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gcpdedm-server
+  name: gcpdedm-app-backend
+  namespace: gcpdedmns
+spec:
+  type: NodePort
+  selector:
+    app: gcpdedm-server
+  ports:
+  - port: 80
+    targetPort: 45100
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: gcpdedm-server
+  namespace: gcpdedmns
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: gcpdedm-ip
+    networking.gke.io/managed-certificates: gcpdedm-certificate,gcpdedm-www-certificate
+  labels:
+    app: gcpdedm-server
+spec:
+  backend:
+    serviceName: gcpdedm-app-backend
+    servicePort: 80
+---
+apiVersion: networking.gke.io/v1beta1
+kind: ManagedCertificate
+metadata:
+  name: gcpdedm-certificate
+  namespace: gcpdedmns
+spec:
+  domains:
+    - gcpdedm.com
+---
+apiVersion: networking.gke.io/v1beta1
+kind: ManagedCertificate
+metadata:
+  name: gcpdedm-www-certificate
+  namespace: gcpdedmns
+spec:
+  domains:
+    - www.gcpdedm.com
+
