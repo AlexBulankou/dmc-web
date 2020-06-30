@@ -3,7 +3,7 @@ import compression from 'compression';
 import express from 'express';
 import cors from 'cors';
 import { ConvertRoute } from './convert_route';
-//import path from 'path';
+import path from 'path';
 
 
 
@@ -87,14 +87,13 @@ convertRouter.post(
 app.use('/api/convert', convertRouter);
 
 
-/*
-var htmlContentRouter = express.Router();
-htmlContentRouter.get("/", (_req, res) => {
+
+var uiRouter = express.Router();
+uiRouter.get("/", (_req, res) => {
     res.contentType("html");
-    res.sendFile(path.join(__dirname, '../../src/sky.html'));
+    res.sendFile(path.join(__dirname, '../../src/ui/home.html'));
 });
-app.use('/', htmlContentRouter);
-*/
+app.use('/', uiRouter);
 
 /**
  * Start Express server.

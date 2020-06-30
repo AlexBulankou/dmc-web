@@ -1,0 +1,373 @@
+config:
+  content: |
+    imports:
+    - path: cloudsql.jinja
+    resources:
+    - name: cloudsql
+      type: cloudsql.jinja
+      properties:
+        database:
+          name: test
+        dbUser:
+          user: root
+          password: (redacted)
+        failover: true
+        readReplicas: 1
+expandedConfig: |
+  resources:
+  - name: d2-cloudsql-master
+    properties:
+      backendType: SECOND_GEN
+      databaseVersion: MYSQL_5_7
+      instanceType: CLOUD_SQL_INSTANCE
+      region: us-central1
+      settings:
+        activationPolicy: ALWAYS
+        backupConfiguration:
+          binaryLogEnabled: true
+          enabled: true
+          startTime: 00:00
+        dataDiskSizeGb: 200
+        dataDiskType: PD_SSD
+        ipConfiguration:
+          authorizedNetworks: null
+        locationPreference:
+          zone: us-central1-a
+        replicationType: SYNCHRONOUS
+        storageAutoResize: true
+        tier: db-n1-highmem-4
+    type: sqladmin.v1beta4.instance
+  - name: d2-cloudsql-failover
+    properties:
+      backendType: SECOND_GEN
+      databaseVersion: MYSQL_5_7
+      instanceType: READ_REPLICA_INSTANCE
+      masterInstanceName: $(ref.d2-cloudsql-master.name)
+      region: us-central1
+      replicaConfiguration:
+        failoverTarget: true
+      settings:
+        tier: db-n1-highmem-4
+    type: sqladmin.v1beta4.instance
+    metadata:
+      dependsOn:
+      - d2-cloudsql-master
+  - metadata:
+      dependsOn:
+      - d2-cloudsql-failover
+      - d2-cloudsql-master
+    name: d2-cloudsql-rr-0
+    properties:
+      backendType: SECOND_GEN
+      databaseVersion: MYSQL_5_7
+      instanceType: READ_REPLICA_INSTANCE
+      masterInstanceName: $(ref.d2-cloudsql-master.name)
+      region: us-central1
+      replicaConfiguration:
+        failoverTarget: false
+      settings:
+        tier: db-n1-highmem-4
+    type: sqladmin.v1beta4.instance
+  - metadata:
+      dependsOn:
+      - d2-cloudsql-failover
+      - d2-cloudsql-rr-0
+      - d2-cloudsql-master
+    name: d2-cloudsql-db
+    properties:
+      charset: utf8
+      instance: $(ref.d2-cloudsql-master.name)
+      name: test
+    type: sqladmin.v1beta4.database
+  - metadata:
+      dependsOn:
+      - d2-cloudsql-db
+      - d2-cloudsql-master
+    name: d2-cloudsql-db-root
+    properties:
+      host: '%'
+      instance: $(ref.d2-cloudsql-master.name)
+      name: root
+      password: (redacted)
+    type: sqladmin.v1beta4.user
+id: '2122559143185567685'
+imports:
+- content: |
+    info:
+      title: CloudSQL
+      author: mwallman@google.com
+      description: |
+        Creates a CloudSQL deployment
+      version: 0.1
+
+    properties:
+      failover:
+        type: boolean
+        description: enable failover replica
+        default: true
+
+      readReplicas:
+        type: integer
+        description: number of read replicas
+        minimum: 0
+        maximum: 5
+        default: 0
+
+      cloudsql:
+        type: object
+        default:
+          properties: 
+        properties:
+          databaseVersion:
+            type: string
+            description: MYSQL_5_7 or MYSQL_5_6
+            default: MYSQL_5_7
+          dataDiskSizeGb:
+            type: integer
+            minimum: 10
+            maximum: 10000
+            default: 200
+          dataDiskType:
+            type: string
+            decription: PD_SSD or PD_HDD
+            default: PD_SSD
+          backupStartTime:
+            type: string
+            description: HH:MM in 24 hour format
+            default: '00:00'
+          tier:
+            type: string
+            description: https://cloud.google.com/sql/pricing#2nd-gen-pricing
+            default: db-n1-highmem-4
+          region:
+            type: string
+            description: i.e. us-central1
+            default: us-central1
+          zone:
+            type: string
+            description: i.e. us-central1-a
+            default: us-central1-a
+          authorizedNetworks:
+            type: array
+            description: An array of allowed CIDR blocks
+            items:
+              type: string
+
+      databaseFlags: 
+        type: array
+        description: An array of https://cloud.google.com/sql/docs/mysql/flags
+        items:
+          type: object
+          required:
+            - name
+            - value 
+          properties:
+            name: 
+              type: string 
+            value:
+              type: 
+                - integer
+                - string
+      
+      dbUser:
+        type: object
+        required:
+          - password
+        properties:
+          name:
+            type: string
+            default: root
+          host:
+            type: string
+            default: '%'
+          password:
+            type: string
+      
+      database: 
+        type: object
+        required:
+          - name
+        properties:
+          name: 
+            type: string
+          charset:
+            type: string
+            description: https://dev.mysql.com/doc/refman/5.7/en/charset.html
+            default: utf8
+  name: cloudsql.jinja.schema
+- content: |-
+    {% set ID = env['deployment'] + '-' + env['name'] %}
+    {%- macro dbDependencyList(failover='', readReplicas='') -%}
+      {% if failover %}
+        - {{ ID }}-failover
+      {% endif %}
+      {% for i in range(readReplicas) %}
+        - {{ ID }}-rr-{{ i }}
+      {% endfor %}
+    {%- endmacro %}
+    {% set dbDeps = dbDependencyList(properties['failover'], 
+      properties['readReplicas']) %}
+    resources:
+    - name: {{ ID }}-master
+      type: sqladmin.v1beta4.instance
+      properties:
+        backendType: SECOND_GEN
+        instanceType: CLOUD_SQL_INSTANCE
+        databaseVersion: {{ properties['cloudsql']['databaseVersion'] }}
+        region: {{ properties['cloudsql']['region'] }}
+        settings:
+          tier: {{ properties['cloudsql']['tier'] }}
+          dataDiskSizeGb: {{ properties['cloudsql']['dataDiskSizeGb'] }}
+          dataDiskType: {{ properties['cloudsql']['dataDiskType'] }}
+          storageAutoResize: true
+          replicationType: SYNCHRONOUS
+          locationPreference:
+            zone: {{ properties['cloudsql']['zone'] }}
+          {% if properties['databaseFlags'] %}
+          databaseFlags: {{ properties['databaseFlags'] }}
+          {% endif %}
+          activationPolicy: ALWAYS
+          backupConfiguration:
+            enabled: true
+            binaryLogEnabled: true
+            startTime: "{{ properties['cloudsql']['backupStartTime'] }}"
+          ipConfiguration:
+            authorizedNetworks: {{ properties['cloudsql']['authorizedNetworks'] }}
+    {% if properties['failover'] %}
+    - name: {{ ID }}-failover
+      type: sqladmin.v1beta4.instance
+      properties:
+        backendType: SECOND_GEN
+        instanceType: READ_REPLICA_INSTANCE
+        databaseVersion: {{ properties['cloudsql']['databaseVersion'] }}
+        region: {{ properties['cloudsql']['region'] }}
+        masterInstanceName: $(ref.{{ ID }}-master.name)
+        replicaConfiguration:
+          failoverTarget: true
+        settings:
+          tier: {{ properties['cloudsql']['tier'] }}
+    {% endif %}
+    {% for i in range(properties['readReplicas']) %}
+    - name: {{ ID }}-rr-{{ i }}
+      type: sqladmin.v1beta4.instance
+      properties:
+        backendType: SECOND_GEN
+        instanceType: READ_REPLICA_INSTANCE
+        databaseVersion: {{ properties['cloudsql']['databaseVersion'] }}
+        region: {{ properties['cloudsql']['region'] }}
+        masterInstanceName: $(ref.{{ ID }}-master.name)
+        replicaConfiguration:
+          failoverTarget: false
+        settings:
+          tier: {{ properties['cloudsql']['tier'] }}
+      {% if properties['failover'] %}
+      metadata:
+        dependsOn:
+          - {{ ID }}-failover
+      {% endif %}
+    {% endfor %}
+
+    {% if properties['database'] %}
+    - name: {{ ID }}-db
+      type: sqladmin.v1beta4.database
+      properties:
+        name: {{ properties['database']['name'] }}
+        instance: $(ref.{{ ID }}-master.name)
+        charset: {{ properties['database']['charset'] }}
+      metadata:
+        dependsOn: 
+          {{ dbDeps }}
+    {% endif %}
+
+    {% if properties['dbUser'] %}
+    - name: {{ ID }}-db-root
+      type: sqladmin.v1beta4.user
+      properties:
+        name: {{ properties['dbUser']['name'] }}
+        host:  "{{ properties['dbUser']['host'] }}"
+        instance: $(ref.{{ ID }}-master.name)
+        password: {{ properties['dbUser']['password'] }}
+      metadata:
+        dependsOn:
+        {% if properties['database'] %}
+          - {{ ID }}-db
+        {% else %}
+          {{ dbDeps }}  
+        {% endif %}
+    {% endif %}
+
+    outputs:
+      - name: {{ ID }}-master-ip
+        value: $(ref.{{ ID }}-master.ipAddresses[0].ipAddress)
+      - name: {{ ID }}-master-connectionName
+        value: $(ref.{{ ID }}-master.connectionName)
+      {% if properties['failover'] %} 
+      - name: {{ ID }}-failover-ip
+        value: $(ref.{{ ID }}-failover.ipAddresses[0].ipAddress)
+      - name: {{ ID }}-failover-connectionName
+        value: $(ref.{{ ID }}-failover.connectionName)
+      {% endif %}
+      {% for i in range(properties['readReplicas']) %}
+      - name: {{ ID }}-rr-{{ i }}-ip
+        value: $(ref.{{ ID }}-rr-{{ i }}.ipAddresses[0].ipAddress)
+      - name: {{ ID }}-rr-{{ i }}-connectionName
+        value: $(ref.{{ ID }}-rr-{{ i }}.connectionName)
+      {% endfor %}
+  name: cloudsql.jinja
+insertTime: '2020-06-28T12:36:10.378-07:00'
+layout: |
+  resources:
+  - name: cloudsql
+    outputs:
+    - finalValue: 35.188.175.172
+      name: d2-cloudsql-master-ip
+      value: $(ref.d2-cloudsql-master.ipAddresses[0].ipAddress)
+    - finalValue: alexbu-test-20200622-1:us-central1:d2-cloudsql-master
+      name: d2-cloudsql-master-connectionName
+      value: $(ref.d2-cloudsql-master.connectionName)
+    - finalValue: 35.188.175.172
+      name: d2-cloudsql-failover-ip
+      value: $(ref.d2-cloudsql-failover.ipAddresses[0].ipAddress)
+    - finalValue: alexbu-test-20200622-1:us-central1:d2-cloudsql-master
+      name: d2-cloudsql-failover-connectionName
+      value: $(ref.d2-cloudsql-failover.connectionName)
+    - finalValue: 35.188.175.172
+      name: d2-cloudsql-rr-0-ip
+      value: $(ref.d2-cloudsql-rr-0.ipAddresses[0].ipAddress)
+    - finalValue: alexbu-test-20200622-1:us-central1:d2-cloudsql-master
+      name: d2-cloudsql-rr-0-connectionName
+      value: $(ref.d2-cloudsql-rr-0.connectionName)
+    properties:
+      cloudsql:
+        backupStartTime: 00:00
+        dataDiskSizeGb: 200
+        dataDiskType: PD_SSD
+        databaseVersion: MYSQL_5_7
+        properties: null
+        region: us-central1
+        tier: db-n1-highmem-4
+        zone: us-central1-a
+      database:
+        charset: utf8
+        name: test
+      dbUser:
+        host: '%'
+        name: root
+        password: test123_
+        user: root
+      failover: true
+      readReplicas: 1
+    resources:
+    - name: d2-cloudsql-master
+      type: sqladmin.v1beta4.instance
+    - name: d2-cloudsql-failover
+      type: sqladmin.v1beta4.instance
+    - name: d2-cloudsql-rr-0
+      type: sqladmin.v1beta4.instance
+    - name: d2-cloudsql-db
+      type: sqladmin.v1beta4.database
+    - name: d2-cloudsql-db-root
+      type: sqladmin.v1beta4.user
+    type: cloudsql.jinja
+name: manifest-1593372970367
+selfLink: https://www.googleapis.com/deploymentmanager/v2/projects/alexbu-test-20200622-1/global/deployments/d2/manifests/manifest-1593372970367
