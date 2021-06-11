@@ -16,7 +16,9 @@ module.exports = {
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
     'src/**/*.{ts,tsx,js,jsx}',
-    '!src/**/*.d.ts'
+    '!src/**/*.d.ts',
+    '!src/app-backup.ts',
+    '!src/controllers/api.ts'
   ],
   restoreMocks: true
 };

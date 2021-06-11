@@ -10,7 +10,7 @@ import path from 'path';
 const app = express();
 
 
-app.set("port", 46100);
+app.set("port", 8002);
 
 app.use(compression(/*{
     threshold: 0, // or whatever you want the lower threshold to be
@@ -111,4 +111,4 @@ const server = app.listen(app.get("port"), () => {
 
 
 
-export default server;
+export {app, server};
