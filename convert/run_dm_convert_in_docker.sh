@@ -1,5 +1,5 @@
-#sudo docker run us-central1-docker.pkg.dev/dm-convert-host/deployment-manager/dm-convert:private-preview --helpshort
-sudo docker run  \
+# docker run us-central1-docker.pkg.dev/dm-convert-host/deployment-manager/dm-convert:private-preview --helpshort
+docker run  \
     -v /home/alexb/src/github.com/ab/dmc-web/convert:/mnt \
     --rm \
     us-central1-docker.pkg.dev/dm-convert-host/deployment-manager/dm-convert:private-preview \
@@ -11,7 +11,7 @@ sudo docker run  \
     --deployment_name [DEPLOYMENT_NAME]
 
 
-sudo docker run  \
+docker run  \
     -v /home/alexb/src/github.com/ab/dmc-web/convert:/mnt \
     --rm \
     us-central1-docker.pkg.dev/dm-convert-host/deployment-manager/dm-convert:private-preview \
