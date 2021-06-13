@@ -1,0 +1,28 @@
+steps:
+- id: '[FETCH_DM_CONFIG]'
+  name: 'gcr.io/cloud-builders/gsutil'
+  entrypoint: 'sh'
+  args: 
+  - '-c'
+  - |
+      mkdir dm
+      gsutil cp "${_BUCKET_URI}/dm/*" dm/.
+      mkdir "${_OUTPUT_FORMAT}"
+
+- id: '[CONVERT_DM_CONFIG]'
+  name: '${_DM_CONVERT_IMAGE}'
+  args: ['--config', './dm/deployment.yaml',
+         '--project_id', '${PROJECT_ID}',
+          '--project_number', '${PROJECT_NUMBER}',
+          '--output_format', '${_OUTPUT_FORMAT}',
+          '--output_file', '${_OUTPUT_FORMAT}/${_OUTPUT_FILE}',
+          '--deployment_name', '${_DEPLOYMENT_NAME}']
+
+- id: '[EXPORT_OUTPUT_TO_STORAGE_BUCKET]'
+  name: 'gcr.io/cloud-builders/gsutil'
+  entrypoint: 'sh'
+  args: 
+  - '-c'
+  - |
+      gsutil cp "${_OUTPUT_FORMAT}/${_OUTPUT_FILE}" \
+        "${_BUCKET_URI}/output/${_OUTPUT_FILE}"

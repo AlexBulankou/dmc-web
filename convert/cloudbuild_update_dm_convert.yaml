@@ -1,0 +1,12 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  entrypoint: 'bash'
+  args: ['-c', 'docker pull us-central1-docker.pkg.dev/dm-convert-host/deployment-manager/dm-convert:private-preview; docker save -o dm-convert.tar us-central1-docker.pkg.dev/dm-convert-host/deployment-manager/dm-convert:private-preview; ']
+- id: '[EXPORT_OUTPUT_TO_STORAGE_BUCKET]'
+  name: 'gcr.io/cloud-builders/gsutil'
+  entrypoint: 'sh'
+  args: 
+  - '-c'
+  - |
+      gsutil cp "dm-convert.tar" \
+        "gs://alexbu-dm-convert-20210511-dm-config/output/dm-convert.tar"
