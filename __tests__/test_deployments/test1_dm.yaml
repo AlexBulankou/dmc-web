@@ -1,0 +1,22 @@
+resources:
+- name: bigquerydataset
+  type: bigquery.v2.dataset
+  properties:
+    datasetReference:
+      datasetId: bigquerydataset
+      projectId: [PROJECT_ID]
+    defaultTableExpirationMs: 36000000
+    location: us-west1
+- type: bigquery.v2.table
+  name: bigquerytable
+  properties:
+    datasetId: bigquerydataset
+    labels:
+      data-source: external
+      schema-type: auto-junk
+    tableReference:
+      projectId: [PROJECT_ID]
+      tableId: bigquerytable
+  metadata:
+    dependsOn:
+    - bigquerydataset

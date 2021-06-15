@@ -1,61 +1,33 @@
 import express from 'express';
-import yaml = require('yamljs');
+import { Converter, ConvertOutputSet } from "./converter";
 
 export class ConvertRoute {
+    private converter = new Converter();
 
     public serve(req: express.Request, res: express.Response) {
-        const parsingErrors: string[] = [];
-        const resources: { [name: string]: any; } = {};
 
-        const getResourcesResult = this.getResources(req, parsingErrors, resources);
-        if (getResourcesResult) {
-
-            this.sendResponse(
-                res,
-                200,
-                { "error_summary": "resources not supported: " + JSON.stringify(resources) },
-                { "error_summary": "resources not supported: " + JSON.stringify(resources) });
-
+        if (req.body && req.body.manifest) {
+            const manifestString = req.body.manifest;
+            this.converter.convert({ dmConfig: manifestString }, (output: ConvertOutputSet) => {
+                this.sendResponse(
+                    res,
+                    200,
+                    output);
+            });
         } else {
+
             this.sendResponse(
                 res,
                 400,
-                { "error_summary": "cannot convert to Config Connector. " + JSON.stringify(parsingErrors) },
-                { "error_summary": "cannot convert to Terraform. " + JSON.stringify(parsingErrors) });
+                { "error_summary": "Cannot parse expanded config" });
         }
     }
 
-    private getResources(req: express.Request, parsingErrors: string[], resources: { [name: string]: any; }): boolean {
-        const manifestString = req.body.manifest;
-
-        if (!manifestString) {
-            parsingErrors.push("Request data empty");
-            return false;
-        }
-
-        let manifestObjects = [];
-        try {
-            manifestObjects = yaml.parse(manifestString);
-        }
-        catch (e) {
-            parsingErrors.push(e.toString());
-            return false;
-        }
-
-        if (!manifestObjects) {
-            parsingErrors.push("Could not parse yaml manifest");
-            return false;
-        }
-
-        resources["test"] = {};
-        return true;
-    }
-
-    private sendResponse(res: express.Response, responseCode: number, kccPayload: any, tfPayload: any) {
+    private sendResponse(res: express.Response, responseCode: number, payload: any) {
         res.status(responseCode);
         res.contentType("json");
 
-        res.send({ kcc: kccPayload, tf: tfPayload });
+        res.send(payload);
         res.end();
     }
 }

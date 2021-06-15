@@ -1,0 +1,14 @@
+version: '3'
+services:
+ dmc-web:
+  build:
+   context: ./
+  ports:
+  - "8003:8002"
+  container_name: dmc-web
+  restart: always
+  volumes:
+  - ./src/ui:/usr/src/app/src/ui
+  - /var/run/docker.sock:/var/run/docker.sock
+  - /usr/bin/docker:/usr/bin/docker
+  - /tmp:/tmp
